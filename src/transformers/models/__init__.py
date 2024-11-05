@@ -130,6 +130,7 @@ from . import (
     levit,
     lilt,
     llama,
+    llama_split,
     llava,
     llava_next,
     llava_next_video,
