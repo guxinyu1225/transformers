@@ -1404,9 +1404,9 @@ class LlamaSplitForCausalLM(LlamaSplitPreTrainedModel, GenerationMixin):
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
-        self.bottom_output_size = 0
-        self.trunk_output_size = 0
-        self.top_output_size = 0
+        self.bottom_output_num = 0
+        self.trunk_output_num = 0
+        self.top_output_num = 0
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -1457,7 +1457,7 @@ class LlamaSplitForCausalLM(LlamaSplitPreTrainedModel, GenerationMixin):
             cache_position=cache_position,
         )
         if self.training:
-            self.bottom_output_size += sys.getsizeof(bottom_outputs['last_hidden_states'])
+            self.bottom_output_num += sys.getsizeof(bottom_outputs['last_hidden_states'])
 
         trunk_outputs = self.trunk_model(
             last_hidden_states=bottom_outputs['last_hidden_states'],
@@ -1471,7 +1471,7 @@ class LlamaSplitForCausalLM(LlamaSplitPreTrainedModel, GenerationMixin):
             return_dict=return_dict,
         )
         if self.training:
-            self.trunk_output_size += sys.getsizeof(trunk_outputs['last_hidden_states'])
+            self.trunk_output_num += sys.getsizeof(trunk_outputs['last_hidden_states'])
 
         top_outputs = self.top_model(
             last_hidden_states=trunk_outputs['last_hidden_states'],
@@ -1485,7 +1485,7 @@ class LlamaSplitForCausalLM(LlamaSplitPreTrainedModel, GenerationMixin):
             return_dict=return_dict,
         )
         if self.training:
-            self.top_output_size += sys.getsizeof(top_outputs['last_hidden_states'])
+            self.top_output_num += sys.getsizeof(top_outputs['last_hidden_states'])
 
         hidden_states = top_outputs['last_hidden_states']
         if self.config.pretraining_tp > 1:
@@ -1613,3 +1613,30 @@ class LlamaSplitForCausalLM(LlamaSplitPreTrainedModel, GenerationMixin):
         self.trunk_model.load_trunk_model(trunk_state_dict)
         self.top_model.load_top_model(top_state_dict)
         self.load_lm_head(lm_head_state_dict)
+
+    def calculate_model_param_count(self, model_part):
+        param_count = 0
+        for param in model_part.parameters():
+            param_count += param.numel()
+            # param_size += param.numel() * param.element_size()  
+        # return param_count, param_size / (1024 ** 2)  
+        return param_count
+    
+    # def get_bottom_and_top_sizes(self):
+    #     # Calculate and print the size of bottom_model and top_model
+    #     bottom_count, bottom_size = self.calculate_model_size(self.bottom_model)
+    #     top_count, top_size = self.calculate_model_size(self.top_model)
+
+    #     return bottom_count, bottom_size, top_count, top_size
+    #     # print(f"Total parameters in bottom_model: {bottom_count}")
+    #     # print(f"Memory usage of bottom_model: {bottom_size:.2f} MB")
+        
+    #     # print(f"Total parameters in top_model: {top_count}")
+    #     # print(f"Memory usage of top_model: {top_size:.2f} MB")
+
+    # def get_trunk_sizes(self):
+    #     trunk_count, trunk_size = self.calculate_model_size(self.trunk_model)
+    #     return trunk_count, trunk_size
+
+    
+
